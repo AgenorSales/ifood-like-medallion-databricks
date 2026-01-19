@@ -42,8 +42,8 @@ Principais características:
 - **Power BI**
 - **Python / SQL**
 
-- 
+## 📂 Estrutura do Repositório
+
 <img width="299" height="354" alt="image" src="https://github.com/user-attachments/assets/a88e61fa-cc0c-4905-9351-d97765979867" />
 
 
-## 📂 Estrutura do Repositório
