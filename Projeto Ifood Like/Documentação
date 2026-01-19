@@ -1,0 +1,273 @@
+# Documentação Completa — Pipeline Medallion estilo iFood (Databricks)
+
+## Visão Geral
+
+Este projeto implementa um **pipeline de Engenharia de Dados end-to-end** simulando
+um cenário de pedidos em “quase tempo real”, inspirado em plataformas como o iFood.
+
+A solução foi construída utilizando **Databricks Serverless**, **Unity Catalog**,
+**Delta Lake** e **Apache Spark Structured Streaming**, seguindo o padrão de
+**Arquitetura Medallion (Bronze / Silver / Gold)**.
+
+O foco do projeto é demonstrar **padrões reais de produção**, indo além de exemplos
+didáticos, com ingestão incremental, tratamento de erros, deduplicação,
+consolidação de estado e entrega de dados prontos para BI.
+
+---
+
+## Objetivos do Projeto
+
+- Simular ingestão incremental de eventos OLTP (orders)
+- Aplicar Arquitetura Medallion na prática
+- Trabalhar com restrições reais de ambientes Serverless
+- Implementar deduplicação e MERGE incremental
+- Consolidar estado atual de entidades (pedidos)
+- Entregar dados prontos para consumo analítico (Power BI)
+- Demonstrar competências de Engenharia de Dados
+
+---
+
+## Arquitetura Medallion
+
+Fluxo geral do pipeline:
+
+Landing → Bronze → Silver → Gold
+
+### Responsabilidade de cada camada
+
+**Landing**
+- Recebe os dados brutos
+- Nenhuma transformação aplicada
+- Zona de desacoplamento entre fonte e processamento
+
+**Bronze**
+- Ingestão incremental via streaming
+- Tratamento mínimo
+- Tolerância a dados inválidos
+- Inclusão de metadados de ingestão
+
+**Silver**
+- Deduplicação de eventos
+- Consolidação do estado atual do pedido
+- Processamento incremental com MERGE
+
+**Gold**
+- Modelagem analítica
+- Dados prontos para BI
+- Agregações e dimensões
+
+---
+
+## Stack Tecnológica
+
+- Databricks Serverless
+- Apache Spark (Structured Streaming)
+- Delta Lake
+- Unity Catalog
+- Power BI
+- Python e SQL
+
+---
+
+
+---
+
+## Camada Landing
+
+**Notebook:** `01_generator_landing.py`
+
+- Geração de eventos simulando pedidos
+- Escrita em arquivos CSV
+- Cada batch representa novos eventos chegando ao sistema
+- Dados gravados em **Unity Catalog Volume**
+
+Essa abordagem simula fontes como:
+- APIs
+- Filas de mensagens
+- Ingestão via object storage
+
+---
+
+## Camada Bronze
+
+**Notebook:** `02_bronze_stream.py`
+
+### Responsabilidades
+- Leitura incremental dos CSVs da landing
+- Garantia de schema
+- Tolerância a dados inválidos
+- Inclusão de metadados de ingestão
+
+### Técnicas Utilizadas
+- `try_cast` para campos numéricos
+- `try_to_timestamp` para timestamps
+- Uso de `_metadata.file_path` (compatível com Unity Catalog)
+- Trigger `AvailableNow` (compatível com Serverless)
+
+### Tabela de Saída
+workspace.ifood.bronze_orders_events
+
+
+---
+
+## Camada Silver — Deduplicação de Eventos
+
+**Notebook:** `03a_silver_events_dedup_incremental.py`
+
+### Problema Resolvido
+- Eventos duplicados com o mesmo `event_id`
+- Conflitos em operações de MERGE
+
+### Solução
+- Uso de `ROW_NUMBER()` para seleção determinística
+- Manutenção de apenas um registro por `event_id`
+- MERGE incremental e idempotente
+
+### Tabela de Saída
+
+workspace.ifood.silver_orders_events_dedup
+
+
+
+---
+
+## Camada Silver — Estado Atual do Pedido (SCD Tipo 1)
+
+**Notebook:** `03b_silver_orders_state_merge.py`
+
+### Objetivo
+- Manter uma única linha por pedido (`order_id`)
+- Representar sempre o estado mais recente do pedido
+
+### Lógica de Atualização
+- Atualiza registros somente se:
+  - `updated_at` for mais recente
+  - ou `ingestion_ts` for maior
+
+### Padrão Aplicado
+- Slowly Changing Dimension (SCD) Tipo 1
+
+### Tabela de Saída
+workspace.ifood.silver_orders_state
+
+
+---
+
+## Camada Gold — Dados Analíticos (BI-ready)
+
+**Notebook:** `04_gold_powerbi_ready.py`
+
+### Tabela Fato
+
+workspace.ifood.gold_orders_fact
+
+- 1 linha por pedido
+- Tabela central para análises
+
+### Agregado Operacional
+
+
+workspace.ifood.gold_orders_minute
+
+
+- Pedidos por minuto
+- Faturamento bruto
+- Ticket médio
+
+### Dimensões
+- `dim_city`
+- `dim_merchant`
+
+Projetadas para modelo estrela e melhor performance no Power BI.
+
+---
+
+## Consumo no Power BI
+
+### Tabelas recomendadas
+- gold_orders_fact
+- gold_orders_minute
+- dim_city
+- dim_merchant
+
+### Relacionamentos
+
+gold_orders_fact.city → dim_city.city
+gold_orders_fact.merchant_id → dim_merchant.merchant_id
+
+
+
+---
+
+## Governança e Boas Práticas
+
+- Compatível com Unity Catalog
+- Sem dependência do DBFS root público
+- Schemas explícitos
+- Metadados de auditoria
+- Pipeline reiniciável
+- Processamento incremental e idempotente
+
+---
+
+## Conceitos de Engenharia Demonstrados
+
+- Arquitetura Medallion
+- Streaming incremental
+- Deduplicação determinística
+- MERGE incremental
+- SCD Tipo 1
+- Modelagem orientada a BI
+- Engenharia de dados em ambiente Serverless
+
+---
+
+## Dicionário de Dados (Resumo)
+
+### bronze_orders_events
+- event_id (string)
+- order_id (string)
+- event_type (string)
+- event_ts (timestamp)
+- customer_id (int)
+- merchant_id (int)
+- city (string)
+- payment_method (string)
+- order_status (string)
+- items_count (int)
+- subtotal (double)
+- delivery_fee (double)
+- discount (double)
+- total (double)
+- updated_at (timestamp)
+- ingestion_ts (timestamp)
+- source_file (string)
+
+### silver_orders_state
+- order_id
+- customer_id
+- merchant_id
+- city
+- payment_method
+- order_status
+- items_count
+- subtotal
+- delivery_fee
+- discount
+- total
+- last_event_type
+- last_event_ts
+- updated_at
+
+---
+
+## Considerações Finais
+
+Este projeto foi desenvolvido como **portfólio profissional**, com foco na
+transição de **Analista de Dados Sênior para Engenheiro de Dados**, demonstrando
+capacidade de construir, documentar e explicar pipelines de dados reais,
+orientados a produção e consumo analítico.
+
+
+
+
