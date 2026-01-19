@@ -42,31 +42,8 @@ Principais características:
 - **Power BI**
 - **Python / SQL**
 
----
+- 
+<img width="299" height="354" alt="image" src="https://github.com/user-attachments/assets/a88e61fa-cc0c-4905-9351-d97765979867" />
+
 
 ## 📂 Estrutura do Repositório
-ifood-like-medallion-databricks/
-│
-├── notebooks/
-│ ├── 01_landing/
-│ │ └── 01_generator_landing.py
-│ │
-│ ├── 02_bronze/
-│ │ └── 02_bronze_stream.py
-│ │
-│ ├── 03_silver/
-│ │ ├── 03a_silver_events_dedup_incremental.py
-│ │ └── 03b_silver_orders_state_merge.py
-│ │
-│ └── 04_gold/
-│ └── 04_gold_powerbi_ready.py
-│
-├── diagrams/
-│ └── medallion_architecture.png
-│
-├── powerbi/
-│ └── ifood_dashboard.pbix (opcional)
-│
-├── README.md
-├── data_dictionary.md
-└── LICENSE
